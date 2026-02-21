@@ -23,6 +23,7 @@ import (
 // - Configure an outbound HTTP request via Config (URL, method, headers, query, body).
 // - Use Go text/template placeholders (e.g. {{ .Var }}) in any string field.
 // - Call Execute(ctx, data) with a data object to render templates and send the request.
+// - Configurable retries via ExpectedStatus (acceptable codes), MaxRetries (attempts), and Backoff (k8s-style duration, e.g., "30s", "3m", "4d").
 // - No external dependencies; standard library only.
 //
 // Example:
@@ -36,6 +37,9 @@ import (
 //		Body:            `{"id":"{{ .ID }}","message":"{{ .Message | urlencode }}"}`,
 //		TimeoutSeconds:  10,
 //		StrictTemplates: true,
+//		ExpectedStatus:  []int{200, 201},
+//		MaxRetries:      3,
+//		Backoff:         "30s",
 //	}
 //	h, err := hook.New(cfg)
 //	if err != nil {
@@ -245,7 +249,9 @@ func New(cfg Config, opts ...Option) (*Hook, error) {
 // Returns the http.Response (with Body reset to a fresh reader of the returned bytes),
 // the response body bytes, and an error if any step fails.
 //
-// Non-2xx responses are not treated as errors by default. The caller should inspect resp.StatusCode.
+// Non-2xx responses are not treated as errors by default unless ExpectedStatus is set.
+// When ExpectedStatus is provided, any status not in the list triggers retries up to MaxRetries
+// with Backoff delay between attempts; after exhausting retries, an error is returned.
 func (h *Hook) Execute(ctx context.Context, data any) (*http.Response, []byte, error) {
 	// Render method
 	method, err := h.renderString(h.cfg.Method, data)
