@@ -457,8 +457,7 @@ func (h *Hook) funcs() template.FuncMap {
 	}
 }
 
-
- // isExpectedStatus returns true if the given HTTP status code is acceptable
+// isExpectedStatus returns true if the given HTTP status code is acceptable
 // under this Hook's configuration.
 func (h *Hook) isExpectedStatus(code int) bool {
 	if len(h.cfg.ExpectedStatus) == 0 {

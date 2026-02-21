@@ -1,5 +1,10 @@
 # gohook
 
+[![Test Status](https://github.com/jo-hoe/gohook/workflows/test/badge.svg)](https://github.com/jo-hoe/gohook/actions?workflow=test)
+[![Lint Status](https://github.com/jo-hoe/gohook/workflows/lint/badge.svg)](https://github.com/jo-hoe/gohook/actions?workflow=lint)
+[![Go Report Card](https://goreportcard.com/badge/github.com/jo-hoe/gohook)](https://goreportcard.com/report/github.com/jo-hoe/gohook)
+[![Coverage Status](https://coveralls.io/repos/github/jo-hoe/gohook/badge.svg?branch=main)](https://coveralls.io/github/jo-hoe/gohook?branch=main)
+
 Small dependency-free library to execute configurable, template-driven HTTP webhooks using only the Go standard library.
 
 ## Installation
