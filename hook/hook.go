@@ -537,6 +537,7 @@ func parseK8sDuration(s string) (time.Duration, error) {
 	if d, err := time.ParseDuration(s); err == nil {
 		return d, nil
 	}
+
 	units := map[string]time.Duration{
 		"ns": time.Nanosecond,
 		"us": time.Microsecond,
@@ -547,44 +548,83 @@ func parseK8sDuration(s string) (time.Duration, error) {
 		"d":  24 * time.Hour,
 		"w":  7 * 24 * time.Hour,
 	}
+
 	var total time.Duration
-	i := 0
-	for i < len(s) {
-		// skip spaces
-		if s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r' {
-			i++
-			continue
+	for i := 0; i < len(s); {
+		i = skipSpaces(s, i)
+		if i >= len(s) {
+			break
 		}
-		// parse integer value
 		start := i
-		for i < len(s) && s[i] >= '0' && s[i] <= '9' {
-			i++
-		}
-		if start == i {
+
+		// read integer value
+		val, next, ok := readInt64Token(s, i)
+		if !ok {
 			return 0, errors.New("invalid duration: expected number at: " + s[start:])
 		}
-		numStr := s[start:i]
-		// parse unit
-		ustart := i
-		for i < len(s) && ((s[i] >= 'a' && s[i] <= 'z') || (s[i] >= 'A' && s[i] <= 'Z')) {
-			i++
-		}
-		if ustart == i {
+		i = next
+
+		// read unit letters
+		unitStr, nextU, ok := readLettersToken(s, i)
+		if !ok {
 			return 0, errors.New("invalid duration: missing unit after number at: " + s[start:])
 		}
-		unitStr := strings.ToLower(s[ustart:i])
-		mult, ok := units[unitStr]
+		i = nextU
+
+		mult, ok := units[strings.ToLower(unitStr)]
 		if !ok {
-			return 0, errors.New("invalid duration: unknown unit " + unitStr)
-		}
-		// convert numStr to int64
-		var val int64
-		for j := 0; j < len(numStr); j++ {
-			val = val*10 + int64(numStr[j]-'0')
+			return 0, errors.New("invalid duration: unknown unit " + strings.ToLower(unitStr))
 		}
 		total += time.Duration(val) * mult
 	}
 	return total, nil
+}
+
+// Helpers for parseK8sDuration to reduce branching and improve readability.
+
+func isSpace(b byte) bool {
+	switch b {
+	case ' ', '\t', '\n', '\r':
+		return true
+	default:
+		return false
+	}
+}
+
+func isDigit(b byte) bool { return b >= '0' && b <= '9' }
+
+func isLetter(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+}
+
+func skipSpaces(s string, i int) int {
+	for i < len(s) && isSpace(s[i]) {
+		i++
+	}
+	return i
+}
+
+func readInt64Token(s string, i int) (int64, int, bool) {
+	if i >= len(s) || !isDigit(s[i]) {
+		return 0, i, false
+	}
+	var v int64
+	for i < len(s) && isDigit(s[i]) {
+		v = v*10 + int64(s[i]-'0')
+		i++
+	}
+	return v, i, true
+}
+
+func readLettersToken(s string, i int) (string, int, bool) {
+	if i >= len(s) || !isLetter(s[i]) {
+		return "", i, false
+	}
+	start := i
+	for i < len(s) && isLetter(s[i]) {
+		i++
+	}
+	return s[start:i], i, true
 }
 
 func wrapErr(stage string, err error) error {
