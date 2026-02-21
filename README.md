@@ -31,7 +31,7 @@ func main() {
   Query:           map[string]string{"q": "{{ .Query }}"},
   ContentType:     "application/json",
   Body:            `{"id":"{{ .ID }}","message":"{{ .Message | urlencode }}"}`,
-  TimeoutSeconds:  10,
+  Timeout:         "10s",
   StrictTemplates: true,
   ExpectedStatus:  []int{200, 201},
   MaxRetries:      3,
@@ -59,6 +59,64 @@ func main() {
 }
 ```
 
+## HookExecutor (typed helper)
+
+If you prefer a small, strongly-typed wrapper over Hook, use HookExecutor.
+It accepts TemplateData (map[string]string) and optionally a custom *http.Client.
+Internally, NewHookExecutor constructs a Hook and, when a client is provided, uses it via WithHTTPClient.
+If no client is provided, gohook builds a default client honoring Timeout and InsecureSkipVerify in the Config.
+
+Example:
+
+```go
+package main
+
+import (
+  "context"
+  "fmt"
+  "net/http"
+
+  "github.com/jo-hoe/gohook"
+)
+
+func main() {
+  cfg := gohook.Config{
+    URL:            "https://api.example.com/items/{{ .ID }}?src={{ .Source }}",
+    Headers:        map[string]string{"Authorization": "Bearer {{ .Token }}"},
+    ContentType:    "application/json",
+    Body:           `{"message":"{{ .Message | urlencode }}"}`,
+    Timeout:        "10s",
+    ExpectedStatus: []int{200, 201},
+  }
+
+  // Pass a custom client or nil to let gohook create one from cfg
+  var client *http.Client = nil
+  exec, err := gohook.NewHookExecutor(cfg, client)
+  if err != nil {
+    panic(err)
+  }
+
+  resp, body, err := exec.Execute(context.Background(), gohook.TemplateData{
+    Values: map[string]string{
+      "ID":      "42",
+      "Source":  "gohook",
+      "Token":   "abc123",
+      "Message": "hello world",
+    },
+  })
+  if err != nil {
+    panic(err)
+  }
+  fmt.Println("status:", resp.Status)
+  fmt.Println("body bytes:", len(body))
+}
+```
+
+Notes:
+- TemplateData values are exposed to templates as {{ .<Key> }}.
+- Execute returns the underlying *http.Response and response body bytes, similar to Hook.Execute.
+- When a custom *http.Client is provided, Config.Timeout and Config.InsecureSkipVerify are ignored (the client is used as-is).
+
 ## Configuration
 
 All string fields support Go text/template placeholders ({{ ... }}), resolved at Execute time against the provided data object.
@@ -71,7 +129,7 @@ All string fields support Go text/template placeholders ({{ ... }}), resolved at
 | Query              | map[string]string                                  | Query parameters to be added to the URL. Keys and values may contain templates. Merged with URL’s existing query. |
 | Body               | string (optional)                                  | Request body as a string (after templating). |
 | ContentType        | string                                             | Applied if set and "Content-Type" header not already provided by Headers. May contain templates. |
-| TimeoutSeconds     | int (0 uses http.Client default)                   | Timeout applied to the default HTTP client created by New. Ignored if a custom client is supplied via options. |
+| Timeout            | string (K8s-style duration; empty uses http.Client default) | Timeout applied to the default HTTP client created by New. Parsed like "10s", "3m", "1h30m", "4d". Ignored if a custom client is supplied via options. |
 | InsecureSkipVerify | bool                                               | Disables TLS certificate verification for the default client when true. Ignored if a custom client is supplied. |
 | StrictTemplates    | bool                                               | Controls missing key behavior in templates: true → error (missingkey=error); false → render as <no value> (missingkey=default). |
 | ExpectedStatus     | []int                                              | Acceptable HTTP response status codes. When non-empty, any code not in this list is considered unexpected and will trigger retries (up to MaxRetries). |
@@ -84,8 +142,8 @@ Functional options to customize Hook behavior:
 
 | Option                               | Purpose                                | Notes |
 | ------------------------------------ | -------------------------------------- | ----- |
-| WithHTTPClient(c *http.Client)       | Provide a custom http.Client           | When provided, TimeoutSeconds and InsecureSkipVerify from Config are not applied. |
-| WithTimeout(d time.Duration)         | Override client timeout                | Overrides Config.TimeoutSeconds using a time.Duration for the client timeout. |
+| WithHTTPClient(c *http.Client)       | Provide a custom http.Client           | When provided, Timeout and InsecureSkipVerify from Config are not applied. |
+| WithTimeout(d time.Duration)         | Override client timeout                | Overrides Config.Timeout using a time.Duration for the client timeout. |
 | WithStrictTemplates(strict bool)     | Control missing key behavior           | Overrides Config.StrictTemplates. |
 | WithInsecureSkipVerify(insecure bool)| Toggle TLS verification on default client | Ignored if a custom client is provided (best-effort applied if possible). |
 
