@@ -1,4 +1,4 @@
-package gohook
+package goback
 
 import (
 	"context"
@@ -18,7 +18,7 @@ func TestNewHookExecutor_NilClient_UsesConfigFlags(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		exec, err := NewHookExecutor(Config{
+		exec, err := NewCallbackExecutor(Config{
 			URL:                ts.URL,
 			InsecureSkipVerify: true,
 		}, nil)
@@ -35,7 +35,7 @@ func TestNewHookExecutor_NilClient_UsesConfigFlags(t *testing.T) {
 		rs := newRecorderServer([]int{200}, 50*time.Millisecond)
 		defer rs.Close()
 
-		exec, err := NewHookExecutor(Config{
+		exec, err := NewCallbackExecutor(Config{
 			URL:     rs.URL(),
 			Timeout: "10ms",
 		}, nil)
@@ -56,7 +56,7 @@ func TestNewHookExecutor_WithCustomClient_IgnoresConfigInsecureSkipVerify(t *tes
 	defer ts.Close()
 
 	custom := &http.Client{} // no InsecureSkipVerify
-	exec, err := NewHookExecutor(Config{
+	exec, err := NewCallbackExecutor(Config{
 		URL:                ts.URL,
 		InsecureSkipVerify: true, // should be ignored because custom client is provided
 	}, custom)
@@ -83,7 +83,7 @@ func TestHookExecutor_Execute_MapsTemplateDataAndDelegates(t *testing.T) {
 		Body:        "{{ .message }}",
 		// Method intentionally left empty to rely on default (POST because Body non-empty)
 	}
-	exec, err := NewHookExecutor(cfg, nil)
+	exec, err := NewCallbackExecutor(cfg, nil)
 	if err != nil {
 		t.Fatalf("NewHookExecutor error: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestHookExecutor_Execute_MapsTemplateDataAndDelegates(t *testing.T) {
 }
 
 func TestHookExecutor_Execute_StrictTemplatesMissingKeyErrors(t *testing.T) {
-	exec, err := NewHookExecutor(Config{
+	exec, err := NewCallbackExecutor(Config{
 		URL:             "http://example/{{ .missing }}",
 		StrictTemplates: true,
 	}, nil)
@@ -228,7 +228,7 @@ func TestHook_ExecuteMultipart_InMemoryBytes(t *testing.T) {
 	}
 
 	resp, body, err := h.Execute(context.Background(), map[string]any{
-		"Source":  "gohook",
+		"Source":  "goback",
 		"Token":   "abc123",
 		"Title":   "Report",
 		"Note":    "Please review",
@@ -251,8 +251,8 @@ func TestHook_ExecuteMultipart_InMemoryBytes(t *testing.T) {
 	if rs.lastRequest.Method != http.MethodPost {
 		t.Fatalf("expected POST, got %s", rs.lastRequest.Method)
 	}
-	if rs.lastRequest.URL.Query().Get("src") != "gohook" {
-		t.Fatalf("expected query src=gohook")
+	if rs.lastRequest.URL.Query().Get("src") != "goback" {
+		t.Fatalf("expected query src=goback")
 	}
 	if got := rs.lastRequest.Header.Get("Authorization"); got != "Bearer abc123" {
 		t.Fatalf("auth header mismatch: %q", got)
@@ -293,7 +293,7 @@ func TestHookExecutor_ExecuteMultipart_Typed(t *testing.T) {
 			},
 		},
 	}
-	exec, err := NewHookExecutor(cfg, nil)
+	exec, err := NewCallbackExecutor(cfg, nil)
 	if err != nil {
 		t.Fatalf("NewHookExecutor error: %v", err)
 	}

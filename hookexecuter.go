@@ -1,4 +1,4 @@
-package gohook
+package goback
 
 import (
 	"context"
@@ -6,32 +6,32 @@ import (
 )
 
 // TemplateData provides a strongly-typed wrapper for selector values
-// that are made available to gohook templates as {{ .<Key> }}.
+// that are made available to goback templates as {{ .<Key> }}.
 type TemplateData struct {
 	Values map[string]string
 }
 
-// HookExecutor defines a simple, strongly-typed interface to execute a webhook
-// using gohook under the hood.
+// CallbackExecutor defines a simple, strongly-typed interface to execute an HTTP callback
+// using goback under the hood.
 // To send multipart/form-data with in-memory attachments, set Config.Multipart
-// when constructing the HookExecutor via NewHookExecutor, then call Execute.
-// Hook will detect Config.Multipart and build the multipart body automatically.
-type HookExecutor interface {
+// when constructing the CallbackExecutor via NewCallbackExecutor, then call Execute.
+// Callback will detect Config.Multipart and build the multipart body automatically.
+type CallbackExecutor interface {
 	// Execute evaluates templates against the provided data and performs the HTTP request.
 	// It returns the underlying http.Response (if any), the response body bytes, and an error if execution fails.
 	Execute(ctx context.Context, data TemplateData) (*http.Response, []byte, error)
 }
 
-type hookExecutor struct {
-	h *Hook
+type callbackExecutor struct {
+	h *Callback
 }
 
-// NewHookExecutor constructs a HookExecutor from a Config.
-// If client is non-nil, it will be used via WithHTTPClient; otherwise gohook will create its own client
+// NewCallbackExecutor constructs a CallbackExecutor from a Config.
+// If client is non-nil, it will be used via WithHTTPClient; otherwise goback will create its own client
 // honoring Timeout and InsecureSkipVerify from the config.
-func NewHookExecutor(cfg Config, client *http.Client) (HookExecutor, error) {
+func NewCallbackExecutor(cfg Config, client *http.Client) (CallbackExecutor, error) {
 	var (
-		h   *Hook
+		h   *Callback
 		err error
 	)
 	if client != nil {
@@ -42,10 +42,10 @@ func NewHookExecutor(cfg Config, client *http.Client) (HookExecutor, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &hookExecutor{h: h}, nil
+	return &callbackExecutor{h: h}, nil
 }
 
-func (e *hookExecutor) Execute(ctx context.Context, data TemplateData) (*http.Response, []byte, error) {
+func (e *callbackExecutor) Execute(ctx context.Context, data TemplateData) (*http.Response, []byte, error) {
 	payload := make(map[string]any, len(data.Values))
 	for k, v := range data.Values {
 		payload[k] = v

@@ -1,15 +1,15 @@
-# gohook
+# goback
 
-[![Test Status](https://github.com/jo-hoe/gohook/workflows/test/badge.svg)](https://github.com/jo-hoe/gohook/actions?workflow=test)
-[![Lint Status](https://github.com/jo-hoe/gohook/workflows/lint/badge.svg)](https://github.com/jo-hoe/gohook/actions?workflow=lint)
-[![Go Report Card](https://goreportcard.com/badge/github.com/jo-hoe/gohook)](https://goreportcard.com/report/github.com/jo-hoe/gohook)
-[![Coverage Status](https://coveralls.io/repos/github/jo-hoe/gohook/badge.svg?branch=main)](https://coveralls.io/github/jo-hoe/gohook?branch=main)
+[![Test Status](https://github.com/jo-hoe/goback/workflows/test/badge.svg)](https://github.com/jo-hoe/goback/actions?workflow=test)
+[![Lint Status](https://github.com/jo-hoe/goback/workflows/lint/badge.svg)](https://github.com/jo-hoe/goback/actions?workflow=lint)
+[![Go Report Card](https://goreportcard.com/badge/github.com/jo-hoe/goback)](https://goreportcard.com/report/github.com/jo-hoe/goback)
+[![Coverage Status](https://coveralls.io/repos/github/jo-hoe/goback/badge.svg?branch=main)](https://coveralls.io/github/jo-hoe/goback?branch=main)
 
-Small dependency-free library to execute configurable, template-driven HTTP webhooks using only the Go standard library.
+Small dependency-free library to execute configurable, template-driven HTTP callbacks using only the Go standard library.
 
 ## Installation
 
-`go get github.com/jo-hoe/gohook@latest`
+`go get github.com/jo-hoe/goback@latest`
 
 ## Quick start
 
@@ -17,54 +17,54 @@ Small dependency-free library to execute configurable, template-driven HTTP webh
 package main
 
 import (
- "context"
- "fmt"
+	"context"
+	"fmt"
 
- "github.com/jo-hoe/gohook"
+	"github.com/jo-hoe/goback"
 )
 
 func main() {
- cfg := gohook.Config{
-  URL:             "https://api.example.com/items?src={{ .Source }}",
-  Method:          "POST",
-  Headers:         map[string]string{"Authorization": "Bearer {{ .Token }}"},
-  Query:           map[string]string{"q": "{{ .Query }}"},
-  ContentType:     "application/json",
-  Body:            `{"id":"{{ .ID }}","message":"{{ .Message | urlencode }}"}`,
-  Timeout:         "10s",
-  StrictTemplates: true,
-  ExpectedStatus:  []int{200, 201},
-  MaxRetries:      3,
-  Backoff:         "30s",
- }
+	cfg := goback.Config{
+		URL:             "https://api.example.com/items?src={{ .Source }}",
+		Method:          "POST",
+		Headers:         map[string]string{"Authorization": "Bearer {{ .Token }}"},
+		Query:           map[string]string{"q": "{{ .Query }}"},
+		ContentType:     "application/json",
+		Body:            `{"id":"{{ .ID }}","message":"{{ .Message | urlencode }}"}`,
+		Timeout:         "10s",
+		StrictTemplates: true,
+		ExpectedStatus:  []int{200, 201},
+		MaxRetries:      3,
+		Backoff:         "30s",
+	}
 
- h, err := gohook.New(cfg)
- if err != nil {
-  panic(err)
- }
+	cb, err := goback.New(cfg)
+	if err != nil {
+		panic(err)
+	}
 
- resp, respBody, err := h.Execute(context.Background(), map[string]any{
-  "Source":  "gohook",
-  "Token":   "abc123",
-  "Query":   "search term",
-  "ID":      "42",
-  "Message": "hello world",
- })
- if err != nil {
-  panic(err)
- }
+	resp, respBody, err := cb.Execute(context.Background(), map[string]any{
+		"Source":  "goback",
+		"Token":   "abc123",
+		"Query":   "search term",
+		"ID":      "42",
+		"Message": "hello world",
+	})
+	if err != nil {
+		panic(err)
+	}
 
- fmt.Println("status:", resp.Status)
- fmt.Println("body bytes:", len(respBody))
+	fmt.Println("status:", resp.Status)
+	fmt.Println("body bytes:", len(respBody))
 }
 ```
 
-## HookExecutor (typed helper)
+## CallbackExecutor (typed helper)
 
-If you prefer a small, strongly-typed wrapper over Hook, use HookExecutor.
+If you prefer a small, strongly-typed wrapper over Callback, use CallbackExecutor.
 It accepts TemplateData (map[string]string) and optionally a custom *http.Client.
-Internally, NewHookExecutor constructs a Hook and, when a client is provided, uses it via WithHTTPClient.
-If no client is provided, gohook builds a default client honoring Timeout and InsecureSkipVerify in the Config.
+Internally, NewCallbackExecutor constructs a Callback and, when a client is provided, uses it via WithHTTPClient.
+If no client is provided, goback builds a default client honoring Timeout and InsecureSkipVerify in the Config.
 
 Example:
 
@@ -76,11 +76,11 @@ import (
   "fmt"
   "net/http"
 
-  "github.com/jo-hoe/gohook"
+  "github.com/jo-hoe/goback"
 )
 
 func main() {
-  cfg := gohook.Config{
+  cfg := goback.Config{
     URL:            "https://api.example.com/items/{{ .ID }}?src={{ .Source }}",
     Headers:        map[string]string{"Authorization": "Bearer {{ .Token }}"},
     ContentType:    "application/json",
@@ -89,17 +89,17 @@ func main() {
     ExpectedStatus: []int{200, 201},
   }
 
-  // Pass a custom client or nil to let gohook create one from cfg
+  // Pass a custom client or nil to let goback create one from cfg
   var client *http.Client = nil
-  exec, err := gohook.NewHookExecutor(cfg, client)
+  exec, err := goback.NewCallbackExecutor(cfg, client)
   if err != nil {
     panic(err)
   }
 
-  resp, body, err := exec.Execute(context.Background(), gohook.TemplateData{
+  resp, body, err := exec.Execute(context.Background(), goback.TemplateData{
     Values: map[string]string{
       "ID":      "42",
-      "Source":  "gohook",
+      "Source":  "goback",
       "Token":   "abc123",
       "Message": "hello world",
     },
@@ -115,12 +115,12 @@ func main() {
 Notes:
 
 - TemplateData values are exposed to templates as {{ .<Key> }}.
-- Execute returns the underlying *http.Response and response body bytes, similar to Hook.Execute.
+- Execute returns the underlying *http.Response and response body bytes, similar to Callback.Execute.
 - When a custom *http.Client is provided, Config.Timeout and Config.InsecureSkipVerify are ignored (the client is used as-is).
 
 ## Multipart form-data (attachments via in-memory bytes)
 
-Use multipart/form-data to send regular form fields and file attachments from in-memory bytes by configuring Config.Multipart. Then call Execute as usual (either via Hook or HookExecutor). No separate ExecuteMultipart function is needed.
+Use multipart/form-data to send regular form fields and file attachments from in-memory bytes by configuring Config.Multipart. Then call Execute as usual (either via Callback or CallbackExecutor). No separate ExecuteMultipart function is needed.
 
 ### Types
 
@@ -139,19 +139,19 @@ Use multipart/form-data to send regular form fields and file attachments from in
 - Method defaulting: if Config.Method is empty and either Body is non-empty or Multipart is set, the default method is POST; otherwise GET.
 - Templates: field names, field values, file field names, file names, and per-file content types support Go text/template placeholders and StrictTemplates behavior.
 
-#### Example (Hook)
+#### Example (Callback)
 
 ```go
-cfg := gohook.Config{
+cfg := goback.Config{
   URL:            "https://example.com/upload?src={{ .Source }}",
   Headers:        map[string]string{"Authorization": "Bearer {{ .Token }}"},
   ExpectedStatus: []int{201},
-  Multipart: &gohook.Multipart{
+  Multipart: &goback.Multipart{
     Fields: map[string]string{
       "title": "{{ .Title }}",
       "note":  "{{ .Note }}",
     },
-    Files: []gohook.ByteFile{
+    Files: []goback.ByteFile{
       {
         Field:       "file",
         FileName:    "report-{{ .Quarter }}.pdf",
@@ -161,12 +161,12 @@ cfg := gohook.Config{
     },
   },
 }
-h, err := gohook.New(cfg)
+cb, err := goback.New(cfg)
 if err != nil {
   panic(err)
 }
-resp, body, err := h.Execute(context.Background(), map[string]any{
-  "Source":  "gohook",
+resp, body, err := cb.Execute(context.Background(), map[string]any{
+  "Source":  "goback",
   "Token":   "abc123",
   "Title":   "Report",
   "Note":    "Please review",
@@ -174,22 +174,22 @@ resp, body, err := h.Execute(context.Background(), map[string]any{
 })
 ```
 
-#### Example (HookExecutor typed helper)
+#### Example (CallbackExecutor typed helper)
 
 ```go
-exec, err := gohook.NewHookExecutor(gohook.Config{
+exec, err := goback.NewCallbackExecutor(goback.Config{
   URL:            "https://example.com/typed?src={{ .source }}",
   Headers:        map[string]string{"X-Req": "{{ .reqid }}"},
   ExpectedStatus: []int{200},
-  Multipart: &gohook.Multipart{
+  Multipart: &goback.Multipart{
     Fields: map[string]string{"a": "{{ .a }}", "b": "{{ .b }}"},
-    Files:  []gohook.ByteFile{{ Field: "file", FileName: "x.txt", Data: []byte("hello") }},
+    Files:  []goback.ByteFile{{ Field: "file", FileName: "x.txt", Data: []byte("hello") }},
   },
 }, nil)
 if err != nil {
   panic(err)
 }
-resp, body, err := exec.Execute(context.Background(), gohook.TemplateData{
+resp, body, err := exec.Execute(context.Background(), goback.TemplateData{
   Values: map[string]string{"source": "typed", "reqid": "r123", "a": "1", "b": "2"},
 })
 ```
@@ -220,7 +220,7 @@ All string fields support Go text/template placeholders ({{ ... }}), resolved at
 
 ## Options
 
-Functional options to customize Hook behavior:
+Functional options to customize Callback behavior:
 
 | Option                               | Purpose                                | Notes |
 | ------------------------------------ | -------------------------------------- | ----- |
@@ -248,7 +248,7 @@ Example:
 
 ## Concurrency
 
-- Hook is safe for concurrent use if the provided http.Client is safe for concurrent use (the default http.Client is).
+- Callback is safe for concurrent use if the provided http.Client is safe for concurrent use (the default http.Client is).
 
 ## Security note
 

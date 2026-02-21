@@ -1,4 +1,4 @@
-package gohook
+package goback
 
 import (
 	"context"
@@ -181,7 +181,7 @@ func TestTemplatingAndHelpers(t *testing.T) {
 	}
 
 	data := map[string]any{
-		"Source": "gohook",
+		"Source": "goback",
 		"Token":  "abc123",
 		"Bar":    "baz",
 		"C":      "4",
@@ -209,7 +209,7 @@ func TestTemplatingAndHelpers(t *testing.T) {
 
 	// Query merge: a=1, b=3 (overwritten), c=4, q=urlencoded
 	q := r.URL.Query()
-	if q.Get("a") != "1" || q.Get("b") != "3" || q.Get("c") != "4" || q.Get("q") != "hello+world" || q.Get("src") != "gohook" {
+	if q.Get("a") != "1" || q.Get("b") != "3" || q.Get("c") != "4" || q.Get("q") != "hello+world" || q.Get("src") != "goback" {
 		t.Fatalf("unexpected query: %v", q)
 	}
 
@@ -515,11 +515,11 @@ func TestConfigInsecureSkipVerifyOnDefaultClient(t *testing.T) {
 
 // Test isExpectedStatus helper directly
 func TestIsExpectedStatus(t *testing.T) {
-	h := &Hook{cfg: Config{}}
+	h := &Callback{cfg: Config{}}
 	if !h.isExpectedStatus(500) {
 		t.Fatalf("expected true when ExpectedStatus empty")
 	}
-	h2 := &Hook{cfg: Config{ExpectedStatus: []int{200, 201}}}
+	h2 := &Callback{cfg: Config{ExpectedStatus: []int{200, 201}}}
 	if !h2.isExpectedStatus(201) || h2.isExpectedStatus(500) {
 		t.Fatalf("isExpectedStatus logic incorrect")
 	}

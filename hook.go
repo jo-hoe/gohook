@@ -1,5 +1,5 @@
-// // Package gohook provides a small dependency-free library to execute configurable,
-// // template-driven HTTP webhooks.
+// Package goback provides a small dependency-free library to execute configurable,
+// template-driven HTTP callbacks.
 //
 // # Overview
 //
@@ -11,34 +11,34 @@
 //
 // Example:
 //
-//	cfg := hook.Config{
-//	    URL:             "https://api.example.com/items?src={{ .Source }}",
-//	    Method:          "POST",
-//	    Headers:         map[string]string{"Authorization": "Bearer {{ .Token }}"},
-//	    Query:           map[string]string{"q": "{{ .Query }}"},
-//	    ContentType:     "application/json",
-//	    Body:            `{"id":"{{ .ID }}","message":"{{ .Message | urlencode }}"}`,
-//	    Timeout:         "10s",
+//	cfg := goback.Config{
+//	    URL:             \"https://api.example.com/items?src={{ .Source }}\",
+//	    Method:          \"POST\",
+//	    Headers:         map[string]string{\"Authorization\": \"Bearer {{ .Token }}\"},
+//	    Query:           map[string]string{\"q\": \"{{ .Query }}\"},
+//	    ContentType:     \"application/json\",
+//	    Body:            `{\"id\":\"{{ .ID }}\",\"message\":\"{{ .Message | urlencode }}\"}`,
+//	    Timeout:         \"10s\",
 //	    StrictTemplates: true,
 //	    ExpectedStatus:  []int{200, 201},
 //	    MaxRetries:      3,
-//	    Backoff:         "30s",
+//	    Backoff:         \"30s\",
 //	}
-//	h, err := hook.New(cfg)
+//	cb, err := goback.New(cfg)
 //	if err != nil {
 //	    panic(err)
 //	}
-//	resp, respBody, err := h.Execute(context.Background(), map[string]any{
-//	    "Source":  "gohook",
-//	    "Token":   "abc123",
-//	    "Query":   "search term",
-//	    "ID":      "42",
-//	    "Message": "hello world",
+//	resp, respBody, err := cb.Execute(context.Background(), map[string]any{
+//	    \"Source\":  \"goback\",
+//	    \"Token\":   \"abc123\",
+//	    \"Query\":   \"search term\",
+//	    \"ID\":      \"42\",
+//	    \"Message\": \"hello world\",
 //	})
 //	_ = resp
 //	_ = respBody
 //	_ = err
-package gohook
+package goback
 
 import (
 	"bytes"
@@ -57,7 +57,7 @@ import (
 	"time"
 )
 
-// Config defines a single webhook execution plan.
+// Config defines a single callback execution plan.
 // All string fields support Go text/template placeholders ({{ ... }}),
 // which are resolved at Execute time against the provided data object.
 type Config struct {
@@ -92,7 +92,7 @@ type Config struct {
 	// May contain templates.
 	ContentType string `yaml:"contentType"`
 
-	// Timeout applies to the HTTP client used by this Hook, unless a custom
+	// Timeout applies to the HTTP client used by this Callback, unless a custom
 	// client is supplied via options. K8s-style duration string (e.g., "30s", "3m", "1h", "4d").
 	// Empty means no explicit timeout (uses http.Client default).
 	Timeout string `yaml:"timeout"`
@@ -141,24 +141,24 @@ type Multipart struct {
 	Files  []ByteFile        `yaml:"files"`
 }
 
-// Hook is a reusable executor for a webhook Config.
+// Callback is a reusable executor for a callback Config.
 //
-// Hook is safe for concurrent use if the provided http.Client is safe for concurrent use
+// Callback is safe for concurrent use if the provided http.Client is safe for concurrent use
 // (the default http.Client is).
-type Hook struct {
+type Callback struct {
 	cfg        Config
 	client     *http.Client
 	strictTmpl bool
 	backoff    time.Duration
 }
 
-// Option configures a Hook.
-type Option func(*Hook)
+// Option configures a Callback.
+type Option func(*Callback)
 
 // WithHTTPClient provides a custom http.Client. When provided, Timeout
 // and InsecureSkipVerify from Config are not applied (the client is used as-is).
 func WithHTTPClient(c *http.Client) Option {
-	return func(h *Hook) {
+	return func(h *Callback) {
 		if c != nil {
 			h.client = c
 		}
@@ -167,7 +167,7 @@ func WithHTTPClient(c *http.Client) Option {
 
 /* WithTimeout overrides Config.Timeout using a time.Duration. */
 func WithTimeout(d time.Duration) Option {
-	return func(h *Hook) {
+	return func(h *Callback) {
 		if h.client != nil {
 			// respect existing client, just set its Timeout
 			h.client.Timeout = d
@@ -179,7 +179,7 @@ func WithTimeout(d time.Duration) Option {
 
 // WithStrictTemplates overrides Config.StrictTemplates.
 func WithStrictTemplates(strict bool) Option {
-	return func(h *Hook) {
+	return func(h *Callback) {
 		h.strictTmpl = strict
 	}
 }
@@ -187,7 +187,7 @@ func WithStrictTemplates(strict bool) Option {
 // WithInsecureSkipVerify enables/disables TLS verification on the default client.
 // Ignored if a custom client is provided via WithHTTPClient.
 func WithInsecureSkipVerify(insecure bool) Option {
-	return func(h *Hook) {
+	return func(h *Callback) {
 		// only effective when building default client
 		if h.client == nil {
 			tr := cloneDefaultTransport()
@@ -212,11 +212,11 @@ func WithInsecureSkipVerify(insecure bool) Option {
 	}
 }
 
-// New constructs a Hook from cfg and optional functional options.
+// New constructs a Callback from cfg and optional functional options.
 // Validates minimal fields and prepares an http.Client when needed.
-func New(cfg Config, opts ...Option) (*Hook, error) {
+func New(cfg Config, opts ...Option) (*Callback, error) {
 	if strings.TrimSpace(cfg.URL) == "" {
-		return nil, errors.New("hook: URL is required")
+		return nil, errors.New("callback: URL is required")
 	}
 
 	// Choose default method if unset
@@ -230,7 +230,7 @@ func New(cfg Config, opts ...Option) (*Hook, error) {
 	}
 	cfg.Method = method
 
-	h := &Hook{
+	h := &Callback{
 		cfg:        cfg,
 		strictTmpl: cfg.StrictTemplates,
 	}
@@ -276,14 +276,14 @@ func New(cfg Config, opts ...Option) (*Hook, error) {
 	return h, nil
 }
 
-// Execute renders the Hook's config with data and performs the HTTP request.
+// Execute renders the Callback's config with data and performs the HTTP request.
 // Returns the http.Response (with Body reset to a fresh reader of the returned bytes),
 // the response body bytes, and an error if any step fails.
 //
 // Non-2xx responses are not treated as errors by default unless ExpectedStatus is set.
 // When ExpectedStatus is provided, any status not in the list triggers retries up to MaxRetries
 // with Backoff delay between attempts; after exhausting retries, an error is returned.
-func (h *Hook) Execute(ctx context.Context, data any) (*http.Response, []byte, error) {
+func (h *Callback) Execute(ctx context.Context, data any) (*http.Response, []byte, error) {
 	// Prepare static parts once
 	method, err := h.renderMethod(data)
 	if err != nil {
@@ -333,20 +333,20 @@ func (h *Hook) Execute(ctx context.Context, data any) (*http.Response, []byte, e
 }
 
 // renderMethod renders and validates the HTTP method.
-func (h *Hook) renderMethod(data any) (string, error) {
+func (h *Callback) renderMethod(data any) (string, error) {
 	method, err := h.renderString(h.cfg.Method, data)
 	if err != nil {
 		return "", wrapErr("render method", err)
 	}
 	method = strings.ToUpper(strings.TrimSpace(method))
 	if method == "" {
-		return "", errors.New("hook: rendered method empty")
+		return "", errors.New("callback: rendered method empty")
 	}
 	return method, nil
 }
 
 // renderURLWithQuery renders the URL and merges any configured query parameters.
-func (h *Hook) renderURLWithQuery(data any) (*url.URL, error) {
+func (h *Callback) renderURLWithQuery(data any) (*url.URL, error) {
 	rawURL, err := h.renderString(h.cfg.URL, data)
 	if err != nil {
 		return nil, wrapErr("render URL", err)
@@ -371,7 +371,7 @@ func (h *Hook) renderURLWithQuery(data any) (*url.URL, error) {
 }
 
 // buildHeaders renders configured headers and content type.
-func (h *Hook) buildHeaders(data any) (http.Header, error) {
+func (h *Callback) buildHeaders(data any) (http.Header, error) {
 	headers := make(http.Header)
 	if len(h.cfg.Headers) > 0 {
 		renderedH, err := h.renderStringMap(h.cfg.Headers, data)
@@ -399,7 +399,7 @@ func (h *Hook) buildHeaders(data any) (http.Header, error) {
 }
 
 // renderBodyString renders the request body once for reuse across attempts.
-func (h *Hook) renderBodyString(data any) (string, error) {
+func (h *Callback) renderBodyString(data any) (string, error) {
 	if strings.TrimSpace(h.cfg.Body) == "" {
 		return "", nil
 	}
@@ -411,7 +411,7 @@ func (h *Hook) renderBodyString(data any) (string, error) {
 }
 
 // readAndResetBody reads the response body and resets it so the caller can read again.
-func (h *Hook) readAndResetBody(resp *http.Response) ([]byte, error) {
+func (h *Callback) readAndResetBody(resp *http.Response) ([]byte, error) {
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		_ = resp.Body.Close()
@@ -423,7 +423,7 @@ func (h *Hook) readAndResetBody(resp *http.Response) ([]byte, error) {
 }
 
 // waitBackoff waits for the configured backoff duration or context cancellation.
-func (h *Hook) waitBackoff(ctx context.Context) error {
+func (h *Callback) waitBackoff(ctx context.Context) error {
 	if h.backoff <= 0 {
 		return nil
 	}
@@ -438,7 +438,7 @@ func (h *Hook) waitBackoff(ctx context.Context) error {
 }
 
 // executeWithBodyFactory performs attempts with retries using a body factory to create a fresh reader per attempt.
-func (h *Hook) executeWithBodyFactory(ctx context.Context, method, urlStr string, headers http.Header, bodyFactory func() io.Reader) (*http.Response, []byte, error) {
+func (h *Callback) executeWithBodyFactory(ctx context.Context, method, urlStr string, headers http.Header, bodyFactory func() io.Reader) (*http.Response, []byte, error) {
 	var lastResp *http.Response
 	var lastBody []byte
 	var lastErr error
@@ -461,7 +461,7 @@ func (h *Hook) executeWithBodyFactory(ctx context.Context, method, urlStr string
 			} else if h.isExpectedStatus(resp.StatusCode) {
 				return resp, respBody, nil
 			} else {
-				lastResp, lastBody, lastErr = resp, respBody, fmt.Errorf("hook: unexpected status code %d", resp.StatusCode)
+				lastResp, lastBody, lastErr = resp, respBody, fmt.Errorf("callback: unexpected status code %d", resp.StatusCode)
 			}
 		}
 
@@ -478,7 +478,7 @@ func (h *Hook) executeWithBodyFactory(ctx context.Context, method, urlStr string
 // renderString renders a single template string with the provided data.
 // If strict templates are enabled and a missing key is encountered, an error is returned.
 // If the string does not contain "{{", it is returned as-is for performance.
-func (h *Hook) renderString(s string, data any) (string, error) {
+func (h *Callback) renderString(s string, data any) (string, error) {
 	if s == "" {
 		return "", nil
 	}
@@ -505,7 +505,7 @@ func (h *Hook) renderString(s string, data any) (string, error) {
 }
 
 // renderStringMap renders both keys and values of a map[string]string with templates.
-func (h *Hook) renderStringMap(m map[string]string, data any) (map[string]string, error) {
+func (h *Callback) renderStringMap(m map[string]string, data any) (map[string]string, error) {
 	if len(m) == 0 {
 		return nil, nil
 	}
@@ -526,7 +526,7 @@ func (h *Hook) renderStringMap(m map[string]string, data any) (map[string]string
 
 // funcs returns helper functions available inside templates.
 // These are intentionally small and dependency-free.
-func (h *Hook) funcs() template.FuncMap {
+func (h *Callback) funcs() template.FuncMap {
 	return template.FuncMap{
 		// json encodes a value to a JSON string.
 		"json": func(v any) (string, error) {
@@ -548,8 +548,8 @@ func (h *Hook) funcs() template.FuncMap {
 }
 
 // isExpectedStatus returns true if the given HTTP status code is acceptable
-// under this Hook's configuration.
-func (h *Hook) isExpectedStatus(code int) bool {
+// under this Callback's configuration.
+func (h *Callback) isExpectedStatus(code int) bool {
 	if len(h.cfg.ExpectedStatus) == 0 {
 		return true
 	}
@@ -563,7 +563,7 @@ func (h *Hook) isExpectedStatus(code int) bool {
 
 // buildMultipartBody builds and renders a multipart/form-data request using in-memory file data.
 // It renders templated entries and assembles the multipart body in memory.
-func (h *Hook) buildMultipartBody(data any, mp *Multipart) ([]byte, string, error) {
+func (h *Callback) buildMultipartBody(data any, mp *Multipart) ([]byte, string, error) {
 	var buf bytes.Buffer
 	w := multipart.NewWriter(&buf)
 
@@ -594,7 +594,7 @@ func (h *Hook) buildMultipartBody(data any, mp *Multipart) ([]byte, string, erro
 		field = strings.TrimSpace(field)
 		if field == "" {
 			_ = w.Close()
-			return nil, "", errors.New("hook: multipart file field empty after rendering")
+			return nil, "", errors.New("callback: multipart file field empty after rendering")
 		}
 
 		filename := strings.TrimSpace(f.FileName)
@@ -671,7 +671,7 @@ func parseK8sDuration(s string) (time.Duration, error) {
 	}
 
 	var total time.Duration
-	for i := 0; i < len(s); {
+	for i := 0; i < len(s); i++ {
 		i = skipSpaces(s, i)
 		if i >= len(s) {
 			break
@@ -749,7 +749,7 @@ func readLettersToken(s string, i int) (string, int, bool) {
 }
 
 func wrapErr(stage string, err error) error {
-	return errors.New("hook: " + stage + ": " + err.Error())
+	return errors.New("callback: " + stage + ": " + err.Error())
 }
 
 func cloneDefaultTransport() *http.Transport {
